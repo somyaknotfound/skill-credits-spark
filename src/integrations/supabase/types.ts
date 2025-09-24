@@ -14,7 +14,277 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          credits: number
+          full_name: string | null
+          id: string
+          level: number
+          total_credits_earned: number
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          credits?: number
+          full_name?: string | null
+          id?: string
+          level?: number
+          total_credits_earned?: number
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          credits?: number
+          full_name?: string | null
+          id?: string
+          level?: number
+          total_credits_earned?: number
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          rating: number
+          reviewed_id: string
+          reviewer_id: string
+          skill_listing_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating: number
+          reviewed_id: string
+          reviewer_id: string
+          skill_listing_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating?: number
+          reviewed_id?: string
+          reviewer_id?: string
+          skill_listing_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_skill_listing_id_fkey"
+            columns: ["skill_listing_id"]
+            isOneToOne: false
+            referencedRelation: "skill_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      skill_listings: {
+        Row: {
+          created_at: string
+          credit_price: number
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          is_active: boolean
+          skill_id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credit_price?: number
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_active?: boolean
+          skill_id: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credit_price?: number
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_active?: boolean
+          skill_id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skill_listings_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      skill_requests: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          max_credit_price: number | null
+          skill_id: string
+          status: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          max_credit_price?: number | null
+          skill_id: string
+          status?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          max_credit_price?: number | null
+          skill_id?: string
+          status?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skill_requests_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      skills: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          difficulty_level: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          skill_listing_id: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description: string
+          id?: string
+          skill_listing_id?: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          skill_listing_id?: string | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_skill_listing_id_fkey"
+            columns: ["skill_listing_id"]
+            isOneToOne: false
+            referencedRelation: "skill_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_skills: {
+        Row: {
+          created_at: string
+          id: string
+          proficiency_level: string | null
+          skill_id: string
+          user_id: string
+          verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          proficiency_level?: string | null
+          skill_id: string
+          user_id: string
+          verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          proficiency_level?: string | null
+          skill_id?: string
+          user_id?: string
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
