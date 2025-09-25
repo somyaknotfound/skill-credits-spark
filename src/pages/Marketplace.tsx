@@ -1,59 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SkillCard } from "@/components/SkillCard";
 import { Search, Code, Music, Palette, Camera, Globe, TrendingUp } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useMarketplace } from "@/hooks/useMarketplace";
+import { useSkillPurchase } from "@/hooks/useSkillPurchase";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const Marketplace = () => {
-  const { toast } = useToast();
-
-  const skills = [
-    {
-      id: "1",
-      title: "Web Development Fundamentals",
-      category: "Programming",
-      instructor: { name: "Sarah Johnson", avatar: "", level: 22, rating: 4.9 },
-      duration: "4 weeks",
-      students: 234,
-      cost: 150,
-      difficulty: "Beginner" as const,
-      tags: ["HTML", "CSS", "JavaScript"]
-    },
-    {
-      id: "2", 
-      title: "Advanced React Patterns",
-      category: "Programming",
-      instructor: { name: "Mike Rodriguez", avatar: "", level: 28, rating: 4.8 },
-      duration: "6 weeks",
-      students: 89,
-      cost: 300,
-      difficulty: "Advanced" as const,
-      tags: ["React", "TypeScript", "Hooks"]
-    },
-    {
-      id: "3",
-      title: "Guitar for Beginners",
-      category: "Music",
-      instructor: { name: "Emma Wilson", avatar: "", level: 18, rating: 4.7 },
-      duration: "8 weeks", 
-      students: 156,
-      cost: 120,
-      difficulty: "Beginner" as const,
-      tags: ["Acoustic", "Chords", "Strumming"]
-    },
-    {
-      id: "4",
-      title: "Digital Photography Masterclass",
-      category: "Creative",
-      instructor: { name: "David Kim", avatar: "", level: 25, rating: 4.9 },
-      duration: "5 weeks",
-      students: 67,
-      cost: 200,
-      difficulty: "Intermediate" as const,
-      tags: ["DSLR", "Lighting", "Composition"]
-    }
-  ];
+  const { skills, loading, error, currentUserCredits, refetch } = useMarketplace();
+  const { purchaseSkill, loading: purchaseLoading } = useSkillPurchase();
+  const [discounts, setDiscounts] = useState<Record<string, number>>({});
 
   const categories = [
     { name: "Programming", icon: Code, count: 124, color: "text-primary" },
@@ -64,13 +22,36 @@ const Marketplace = () => {
     { name: "Business", icon: TrendingUp, count: 78, color: "text-muted-foreground" },
   ];
 
-  const handleLearnSkill = (skillId: string) => {
-    const skill = skills.find(s => s.id === skillId);
-    if (skill) {
-      toast({
-        title: "Skill Enrolled! 🎉",
-        description: `You've enrolled in "${skill.title}" for ${skill.cost} credits.`,
-      });
+  // Calculate discounts for all skills
+  useEffect(() => {
+    const calculateDiscounts = async () => {
+      if (currentUserCredits === 0 || skills.length === 0) return;
+      
+      const newDiscounts: Record<string, number> = {};
+      
+      for (const skill of skills) {
+        try {
+          const { data } = await supabase.rpc('calculate_credit_discount', {
+            tutor_credits: skill.profiles.credits,
+            student_credits: currentUserCredits
+          });
+          newDiscounts[skill.id] = data || 0;
+        } catch (error) {
+          console.error('Error calculating discount for skill:', skill.id, error);
+          newDiscounts[skill.id] = 0;
+        }
+      }
+      
+      setDiscounts(newDiscounts);
+    };
+
+    calculateDiscounts();
+  }, [skills, currentUserCredits]);
+
+  const handleLearnSkill = async (skillId: string) => {
+    const result = await purchaseSkill(skillId);
+    if (result.success) {
+      refetch(); // Refresh the marketplace data
     }
   };
 
@@ -113,16 +94,55 @@ const Marketplace = () => {
             </div>
           </div>
 
-          {/* Skills Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {skills.map((skill) => (
-              <SkillCard
-                key={skill.id}
-                skill={skill}
-                onLearn={handleLearnSkill}
-              />
-            ))}
+          {/* User Credits Display */}
+          <div className="text-center">
+            <div className="inline-flex items-center space-x-2 bg-gradient-glass backdrop-blur-sm border border-border/50 rounded-lg px-4 py-2">
+              <span className="text-sm text-muted-foreground">Your Credits:</span>
+              <span className="text-lg font-bold text-accent">{currentUserCredits}</span>
+            </div>
           </div>
+
+          {/* Skills Grid */}
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Loading skills...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-destructive mb-4">{error}</p>
+              <Button onClick={refetch} variant="outline">Try Again</Button>
+            </div>
+          ) : skills.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No skills available yet. Be the first to create one!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {skills.map((skill) => (
+                <SkillCard
+                  key={skill.id}
+                  skill={{
+                    id: skill.id,
+                    title: skill.title,
+                    category: skill.skills.category,
+                    instructor: {
+                      name: skill.profiles.full_name || skill.profiles.username,
+                      avatar: skill.profiles.avatar_url,
+                      level: skill.profiles.level,
+                      credits: skill.profiles.credits
+                    },
+                    duration: skill.duration_minutes ? `${Math.round(skill.duration_minutes / 60)} hours` : "Duration varies",
+                    cost: skill.credit_price,
+                    difficulty: (skill.skills.difficulty_level?.charAt(0).toUpperCase() + skill.skills.difficulty_level?.slice(1)) as any || "Beginner"
+                  }}
+                  onLearn={handleLearnSkill}
+                  discountPercentage={discounts[skill.id] || 0}
+                  currentUserCredits={currentUserCredits}
+                  loading={purchaseLoading}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

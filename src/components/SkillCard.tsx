@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star, Clock, Users } from "lucide-react";
+import { Star, Clock, Users, Zap } from "lucide-react";
 
 interface SkillCardProps {
   skill: {
@@ -13,18 +13,22 @@ interface SkillCardProps {
       name: string;
       avatar?: string;
       level: number;
-      rating: number;
+      rating?: number;
+      credits: number;
     };
     duration: string;
-    students: number;
+    students?: number;
     cost: number;
     difficulty: "Beginner" | "Intermediate" | "Advanced";
-    tags: string[];
+    tags?: string[];
   };
   onLearn: (skillId: string) => void;
+  discountPercentage?: number;
+  currentUserCredits?: number;
+  loading?: boolean;
 }
 
-export const SkillCard = ({ skill, onLearn }: SkillCardProps) => {
+export const SkillCard = ({ skill, onLearn, discountPercentage = 0, currentUserCredits = 0, loading = false }: SkillCardProps) => {
   const getDifficultyVariant = (difficulty: string) => {
     switch (difficulty) {
       case "Beginner": return "success";
@@ -33,6 +37,10 @@ export const SkillCard = ({ skill, onLearn }: SkillCardProps) => {
       default: return "default";
     }
   };
+
+  const discountedPrice = Math.round(skill.cost * (100 - discountPercentage) / 100);
+  const canAfford = currentUserCredits >= discountedPrice;
+  const hasDiscount = discountPercentage > 0;
 
   return (
     <Card className="group bg-gradient-glass backdrop-blur-sm border-border/50 hover:border-primary/50 transition-smooth hover:shadow-glow cursor-pointer">
@@ -66,8 +74,14 @@ export const SkillCard = ({ skill, onLearn }: SkillCardProps) => {
               </Badge>
             </div>
             <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-              <Star className="h-3 w-3 fill-accent text-accent" />
-              <span>{skill.instructor.rating}</span>
+              {skill.instructor.rating && (
+                <>
+                  <Star className="h-3 w-3 fill-accent text-accent" />
+                  <span>{skill.instructor.rating}</span>
+                </>
+              )}
+              <Zap className="h-3 w-3 text-primary" />
+              <span>{skill.instructor.credits} credits</span>
             </div>
           </div>
         </div>
@@ -77,33 +91,56 @@ export const SkillCard = ({ skill, onLearn }: SkillCardProps) => {
             <Clock className="h-4 w-4" />
             <span>{skill.duration}</span>
           </div>
-          <div className="flex items-center space-x-1">
-            <Users className="h-4 w-4" />
-            <span>{skill.students} students</span>
-          </div>
+          {skill.students && (
+            <div className="flex items-center space-x-1">
+              <Users className="h-4 w-4" />
+              <span>{skill.students} students</span>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-wrap gap-1">
-          {skill.tags.map((tag, index) => (
-            <Badge key={index} variant="outline" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg font-bold text-accent">{skill.cost}</span>
-            <span className="text-sm text-muted-foreground">credits</span>
+        {skill.tags && skill.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {skill.tags.map((tag, index) => (
+              <Badge key={index} variant="outline" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
           </div>
-          <Button 
-            variant="gaming" 
-            size="sm"
-            onClick={() => onLearn(skill.id)}
-            className="animate-pulse-glow"
-          >
-            Learn Now
-          </Button>
+        )}
+
+        <div className="space-y-2 pt-2">
+          {hasDiscount && (
+            <div className="flex items-center justify-between bg-accent/10 rounded-lg p-2">
+              <div className="flex items-center space-x-2">
+                <Badge variant="secondary" className="text-xs animate-pulse">
+                  {discountPercentage}% OFF
+                </Badge>
+                <span className="text-xs text-muted-foreground">Credit similarity bonus!</span>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              {hasDiscount && (
+                <span className="text-sm line-through text-muted-foreground">{skill.cost}</span>
+              )}
+              <span className={`text-lg font-bold ${hasDiscount ? 'text-accent' : 'text-foreground'}`}>
+                {hasDiscount ? discountedPrice : skill.cost}
+              </span>
+              <span className="text-sm text-muted-foreground">credits</span>
+            </div>
+            <Button 
+              variant={canAfford ? "gaming" : "outline"} 
+              size="sm"
+              onClick={() => onLearn(skill.id)}
+              className={canAfford ? "animate-pulse-glow" : ""}
+              disabled={!canAfford || loading}
+            >
+              {loading ? 'Processing...' : !canAfford ? 'Need More Credits' : 'Learn Now'}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

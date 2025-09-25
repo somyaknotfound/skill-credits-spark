@@ -217,7 +217,10 @@ export type Database = {
           amount: number
           created_at: string
           description: string
+          discount_percentage: number | null
+          discount_reason: string | null
           id: string
+          original_amount: number | null
           skill_listing_id: string | null
           transaction_type: string
           user_id: string
@@ -226,7 +229,10 @@ export type Database = {
           amount: number
           created_at?: string
           description: string
+          discount_percentage?: number | null
+          discount_reason?: string | null
           id?: string
+          original_amount?: number | null
           skill_listing_id?: string | null
           transaction_type: string
           user_id: string
@@ -235,7 +241,10 @@ export type Database = {
           amount?: number
           created_at?: string
           description?: string
+          discount_percentage?: number | null
+          discount_reason?: string | null
           id?: string
+          original_amount?: number | null
           skill_listing_id?: string | null
           transaction_type?: string
           user_id?: string
@@ -290,7 +299,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_credit_discount: {
+        Args: { student_credits: number; tutor_credits: number }
+        Returns: number
+      }
+      purchase_skill_with_discount: {
+        Args: { p_skill_listing_id: string; p_student_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
