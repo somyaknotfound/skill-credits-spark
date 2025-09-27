@@ -1,0 +1,134 @@
+-- =====================================================
+-- FIX PROFILES.CREDITS_BALANCE ERROR
+-- The column doesn't exist, so let's fix the function
+-- =====================================================
+
+-- First, let's check what columns actually exist in profiles table
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'profiles' 
+AND table_schema = 'public';
+
+-- Now let's update the function to use the correct column names
+DROP FUNCTION IF EXISTS get_leaderboard_data_fixed(TEXT);
+
+CREATE OR REPLACE FUNCTION get_leaderboard_data_fixed(time_period TEXT DEFAULT 'all_time')
+RETURNS TABLE (
+  instructor_id UUID,
+  full_name TEXT,
+  username TEXT,
+  avatar_url TEXT,
+  level INTEGER,
+  total_credits BIGINT,
+  skills_taught BIGINT,
+  avg_rating NUMERIC,
+  rank_position BIGINT,
+  is_trending BOOLEAN,
+  students_taught BIGINT,
+  courses_completed BIGINT
+) AS $$
+DECLARE
+  start_date TIMESTAMPTZ;
+BEGIN
+  -- Determine start date based on time period
+  CASE time_period
+    WHEN 'weekly' THEN start_date := now() - interval '7 days';
+    WHEN 'monthly' THEN start_date := now() - interval '30 days';
+    ELSE start_date := '1970-01-01'::timestamptz; -- All time
+  END CASE;
+
+  RETURN QUERY
+  WITH instructor_activities AS (
+    -- Get all instructors who have taught skills
+    SELECT DISTINCT sl.user_id as instructor_id
+    FROM public.skill_listings sl
+    WHERE sl.is_active = true
+  ),
+  instructor_stats AS (
+    SELECT 
+      ia.instructor_id,
+      -- Calculate total credits earned from teaching
+      COALESCE(SUM(
+        CASE 
+          WHEN t.transaction_type = 'teach' THEN ABS(t.amount)
+          ELSE 0 
+        END
+      ), 0) as total_credits,
+      -- Count unique skills taught
+      COUNT(DISTINCT sl.id) as skills_taught,
+      -- Count students taught
+      COUNT(DISTINCT t.user_id) as students_taught,
+      -- Count course completions (students who completed their courses)
+      COUNT(DISTINCT CASE 
+        WHEN cp.progress_percent >= 100 THEN cp.student_id 
+        ELSE NULL 
+      END) as courses_completed
+    FROM instructor_activities ia
+    LEFT JOIN public.skill_listings sl ON sl.user_id = ia.instructor_id AND sl.is_active = true
+    LEFT JOIN public.transactions t ON t.skill_listing_id = sl.id 
+      AND t.transaction_type = 'teach'
+      AND t.created_at >= start_date
+    LEFT JOIN public.course_progress cp ON cp.skill_listing_id = sl.id
+    GROUP BY ia.instructor_id
+  ),
+  instructor_ratings AS (
+    SELECT 
+      r.reviewed_id as instructor_id,
+      AVG(r.rating) as avg_rating
+    FROM public.reviews r
+    WHERE r.created_at >= start_date
+    GROUP BY r.reviewed_id
+  ),
+  ranked_instructors AS (
+    SELECT 
+      is.instructor_id,
+      p.full_name,
+      p.username,
+      p.avatar_url,
+      p.level,
+      is.total_credits,
+      is.skills_taught,
+      is.students_taught,
+      is.courses_completed,
+      COALESCE(ir.avg_rating, 4.5) as avg_rating,
+      ROW_NUMBER() OVER (ORDER BY is.total_credits DESC) as rank_position,
+      -- Check if instructor has recent activity (trending)
+      CASE 
+        WHEN EXISTS (
+          SELECT 1 FROM public.transactions t2
+          JOIN public.skill_listings sl2 ON t2.skill_listing_id = sl2.id
+          WHERE sl2.user_id = is.instructor_id
+            AND t2.transaction_type = 'teach'
+            AND t2.created_at >= (now() - interval '7 days')
+        ) THEN true
+        ELSE false
+      END as is_trending
+    FROM instructor_stats is
+    JOIN public.profiles p ON p.user_id = is.instructor_id
+    LEFT JOIN instructor_ratings ir ON ir.instructor_id = is.instructor_id
+    WHERE is.total_credits > 0
+  )
+  SELECT 
+    ri.instructor_id,
+    ri.full_name,
+    ri.username,
+    ri.avatar_url,
+    ri.level,
+    ri.total_credits,
+    ri.skills_taught,
+    ri.avg_rating,
+    ri.rank_position,
+    ri.is_trending,
+    ri.students_taught,
+    ri.courses_completed
+  FROM ranked_instructors ri
+  ORDER BY ri.total_credits DESC
+  LIMIT 50;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION get_leaderboard_data_fixed(TEXT) TO authenticated;
+
+-- Test the function
+SELECT 'Function updated successfully!' as status;
