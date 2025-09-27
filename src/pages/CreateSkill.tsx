@@ -8,11 +8,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, X, BookOpen, Clock, DollarSign } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const CreateSkill = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState("");
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [description, setDescription] = useState("");
+  const [difficulty, setDifficulty] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [creditPrice, setCreditPrice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const addTag = () => {
     if (currentTag && !tags.includes(currentTag)) {
@@ -25,12 +35,68 @@ const CreateSkill = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Skill Created! 🎉",
-      description: "Your skill has been added to the marketplace and is now available for students.",
-    });
+    if (!title || !category || !difficulty || !creditPrice) {
+      toast({ title: "Missing fields", description: "Please fill required fields." });
+      return;
+    }
+    try {
+      setSubmitting(true);
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      if (!user) throw new Error("Not authenticated");
+
+      // Check if skill already exists, if not create it
+      let { data: existingSkill } = await supabase
+        .from("skills")
+        .select("id")
+        .eq("name", title)
+        .eq("category", category)
+        .single();
+
+      let skill;
+      if (existingSkill) {
+        skill = existingSkill;
+      } else {
+        const { data: newSkill, error: skillErr } = await supabase
+          .from("skills")
+          .insert({
+            name: title,
+            category,
+            description,
+            difficulty_level: difficulty || "beginner",
+          })
+          .select("id")
+          .single();
+        if (skillErr) throw skillErr;
+        skill = newSkill;
+      }
+
+      // Create listing for this user
+      const { error: listErr } = await supabase
+        .from("skill_listings")
+        .insert({
+          user_id: user.id,
+          skill_id: skill.id,
+          title,
+          description,
+          credit_price: Number(creditPrice) || 10,
+          duration_minutes: durationMinutes ? Number(durationMinutes) : null,
+          is_active: true,
+        });
+      if (listErr) throw listErr;
+
+      toast({
+        title: "Skill Created! 🎉",
+        description: "Your skill has been added to the marketplace.",
+      });
+      navigate("/marketplace");
+    } catch (err: any) {
+      toast({ title: "Failed to create skill", description: err.message || String(err) });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -58,12 +124,12 @@ const CreateSkill = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="title">Skill Title</Label>
-                    <Input id="title" placeholder="e.g., Advanced React Patterns" />
+                    <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Advanced React Patterns" />
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>
-                    <Select>
+                    <Select value={category} onValueChange={setCategory}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
@@ -83,6 +149,8 @@ const CreateSkill = () => {
                   <Label htmlFor="description">Description</Label>
                   <Textarea 
                     id="description" 
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                     placeholder="Describe what students will learn..."
                     rows={4}
                   />
@@ -91,7 +159,7 @@ const CreateSkill = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="difficulty">Difficulty</Label>
-                    <Select>
+                    <Select value={difficulty} onValueChange={setDifficulty}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select difficulty" />
                       </SelectTrigger>
@@ -108,7 +176,7 @@ const CreateSkill = () => {
                       <Clock className="h-4 w-4" />
                       <span>Duration</span>
                     </Label>
-                    <Input id="duration" placeholder="e.g., 4 weeks" />
+                    <Input id="duration" value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} placeholder="e.g., 60 (minutes)" />
                   </div>
                   
                   <div className="space-y-2">
@@ -116,7 +184,7 @@ const CreateSkill = () => {
                       <DollarSign className="h-4 w-4" />
                       <span>Credits</span>
                     </Label>
-                    <Input id="credits" type="number" placeholder="150" />
+                    <Input id="credits" type="number" value={creditPrice} onChange={(e) => setCreditPrice(e.target.value)} placeholder="150" />
                   </div>
                 </div>
 
@@ -146,9 +214,9 @@ const CreateSkill = () => {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" variant="gaming">
+                <Button type="submit" className="w-full" variant="gaming" disabled={submitting}>
                   <BookOpen className="mr-2 h-4 w-4" />
-                  Create Skill
+                  {submitting ? "Creating..." : "Create Skill"}
                 </Button>
               </form>
             </CardContent>

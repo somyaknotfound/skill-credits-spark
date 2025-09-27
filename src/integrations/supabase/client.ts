@@ -2,16 +2,39 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://shssaxpuccnuwhjiqcga.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoc3NheHB1Y2NudXdoamlxY2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3NDk2NTYsImV4cCI6MjA3NDMyNTY1Nn0.fOG2GEppiUV-p2EHcVtrySOd4VPy5DDJbrlmrFUjJ34";
+// Get environment variables with fallbacks
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://shssaxpuccnuwhjiqcga.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoc3NheHB1Y2NudXdoamlxY2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3NDk2NTYsImV4cCI6MjA3NDMyNTY1Nn0.fOG2GEppiUV-p2EHcVtrySOd4VPy5DDJbrlmrFUjJ34";
+
+// Debug logging
+if (import.meta.env.VITE_DEBUG === 'true') {
+  console.log('🔧 Supabase Client Configuration:');
+  console.log('URL:', SUPABASE_URL);
+  console.log('Key exists:', !!SUPABASE_ANON_KEY);
+  console.log('Key length:', SUPABASE_ANON_KEY?.length);
+}
+
+// Validate configuration
+if (!SUPABASE_URL) {
+  throw new Error('Missing SUPABASE_URL environment variable');
+}
+
+if (!SUPABASE_ANON_KEY) {
+  throw new Error('Missing SUPABASE_ANON_KEY environment variable');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 });

@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
 const Marketplace = () => {
-  const { skills, loading, error, currentUserCredits, refetch } = useMarketplace();
+  const { skills, loading, error, currentUserCredits, refetch, isSkillPurchased } = useMarketplace();
   const { purchaseSkill, loading: purchaseLoading } = useSkillPurchase();
   const [discounts, setDiscounts] = useState<Record<string, number>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const categories = [
     { name: "Programming", icon: Code, count: 124, color: "text-primary" },
@@ -55,6 +57,23 @@ const Marketplace = () => {
     }
   };
 
+  // Filter skills based on selected category and search query
+  const filteredSkills = skills.filter(skill => {
+    const matchesCategory = !selectedCategory || skill.skills.category.toLowerCase() === selectedCategory.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      skill.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      skill.skills.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      skill.profiles.username.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  // Get actual counts for each category
+  const getCategoryCount = (categoryName: string) => {
+    return skills.filter(skill => 
+      skill.skills.category.toLowerCase() === categoryName.toLowerCase()
+    ).length;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -75,6 +94,8 @@ const Marketplace = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search skills..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 bg-card border-border/50 focus:border-primary/50"
                 />
               </div>
@@ -82,12 +103,33 @@ const Marketplace = () => {
 
             {/* Categories */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <Card 
+                key="all" 
+                className={`bg-gradient-glass backdrop-blur-sm border-border/50 hover:shadow-glow transition-smooth cursor-pointer group ${
+                  selectedCategory === null ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => setSelectedCategory(null)}
+              >
+                <CardContent className="p-4 text-center">
+                  <div className="h-8 w-8 mx-auto mb-2 flex items-center justify-center bg-primary/20 rounded-full">
+                    <span className="text-primary font-bold">All</span>
+                  </div>
+                  <h3 className="font-semibold text-sm">All Skills</h3>
+                  <p className="text-xs text-muted-foreground">{skills.length} skills</p>
+                </CardContent>
+              </Card>
               {categories.map((category) => (
-                <Card key={category.name} className="bg-gradient-glass backdrop-blur-sm border-border/50 hover:shadow-glow transition-smooth cursor-pointer group">
+                <Card 
+                  key={category.name} 
+                  className={`bg-gradient-glass backdrop-blur-sm border-border/50 hover:shadow-glow transition-smooth cursor-pointer group ${
+                    selectedCategory === category.name ? 'ring-2 ring-primary' : ''
+                  }`}
+                  onClick={() => setSelectedCategory(category.name)}
+                >
                   <CardContent className="p-4 text-center">
                     <category.icon className={`h-8 w-8 mx-auto mb-2 ${category.color} group-hover:animate-scale-bounce`} />
                     <h3 className="font-semibold text-sm">{category.name}</h3>
-                    <p className="text-xs text-muted-foreground">{category.count} skills</p>
+                    <p className="text-xs text-muted-foreground">{getCategoryCount(category.name)} skills</p>
                   </CardContent>
                 </Card>
               ))}
@@ -102,6 +144,24 @@ const Marketplace = () => {
             </div>
           </div>
 
+          {/* Category Filter Display */}
+          {selectedCategory && (
+            <div className="text-center">
+              <div className="inline-flex items-center space-x-2 bg-gradient-glass backdrop-blur-sm border border-border/50 rounded-lg px-4 py-2">
+                <span className="text-sm text-muted-foreground">Showing:</span>
+                <span className="text-lg font-bold text-primary">{selectedCategory}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setSelectedCategory(null)}
+                  className="text-xs"
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Skills Grid */}
           {loading ? (
             <div className="text-center py-8">
@@ -112,13 +172,32 @@ const Marketplace = () => {
               <p className="text-destructive mb-4">{error}</p>
               <Button onClick={refetch} variant="outline">Try Again</Button>
             </div>
-          ) : skills.length === 0 ? (
+          ) : filteredSkills.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No skills available yet. Be the first to create one!</p>
+              <p className="text-muted-foreground">
+                {selectedCategory 
+                  ? `No skills found in ${selectedCategory} category.` 
+                  : searchQuery 
+                    ? `No skills found matching "${searchQuery}".` 
+                    : "No skills available yet. Be the first to create one!"
+                }
+              </p>
+              {(selectedCategory || searchQuery) && (
+                <Button 
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setSearchQuery("");
+                  }} 
+                  variant="outline" 
+                  className="mt-2"
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {skills.map((skill) => (
+              {filteredSkills.map((skill) => (
                 <SkillCard
                   key={skill.id}
                   skill={{
@@ -139,6 +218,7 @@ const Marketplace = () => {
                   discountPercentage={discounts[skill.id] || 0}
                   currentUserCredits={currentUserCredits}
                   loading={purchaseLoading}
+                  isPurchased={isSkillPurchased(skill.id)}
                 />
               ))}
             </div>

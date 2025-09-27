@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import animations */
+@import './styles/animations.css';
+
 /* SkillSwap Gamified Design System - HSL Colors Only */
 
 @layer base {

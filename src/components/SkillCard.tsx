@@ -2,7 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star, Clock, Users, Zap } from "lucide-react";
+import { Star, Clock, Users, Zap, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface SkillCardProps {
   skill: {
@@ -26,9 +27,20 @@ interface SkillCardProps {
   discountPercentage?: number;
   currentUserCredits?: number;
   loading?: boolean;
+  isPurchased?: boolean;
+  onViewCourse?: (skillId: string) => void;
 }
 
-export const SkillCard = ({ skill, onLearn, discountPercentage = 0, currentUserCredits = 0, loading = false }: SkillCardProps) => {
+export const SkillCard = ({ skill, onLearn, discountPercentage = 0, currentUserCredits = 0, loading = false, isPurchased = false, onViewCourse }: SkillCardProps) => {
+  const navigate = useNavigate();
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on the button
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    navigate(`/skills/${skill.id}`);
+  };
   const getDifficultyVariant = (difficulty: string) => {
     switch (difficulty) {
       case "Beginner": return "success";
@@ -43,13 +55,19 @@ export const SkillCard = ({ skill, onLearn, discountPercentage = 0, currentUserC
   const hasDiscount = discountPercentage > 0;
 
   return (
-    <Card className="group bg-gradient-glass backdrop-blur-sm border-border/50 hover:border-primary/50 transition-smooth hover:shadow-glow cursor-pointer">
+    <Card 
+      onClick={handleCardClick}
+      className="group bg-gradient-glass backdrop-blur-sm border-border/50 hover:border-primary/50 transition-smooth hover:shadow-glow cursor-pointer"
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
-            <CardTitle className="text-lg font-semibold group-hover:text-primary transition-smooth">
-              {skill.title}
-            </CardTitle>
+            <div className="flex items-center space-x-2">
+              <CardTitle className="text-lg font-semibold group-hover:text-primary transition-smooth">
+                {skill.title}
+              </CardTitle>
+              <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-smooth" />
+            </div>
             <Badge variant="outline">{skill.category}</Badge>
           </div>
           <Badge variant={getDifficultyVariant(skill.difficulty)}>
@@ -123,23 +141,42 @@ export const SkillCard = ({ skill, onLearn, discountPercentage = 0, currentUserC
           
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              {hasDiscount && (
-                <span className="text-sm line-through text-muted-foreground">{skill.cost}</span>
+              {isPurchased ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm text-green-500 font-medium">Purchased</span>
+                </div>
+              ) : (
+                <>
+                  {hasDiscount && (
+                    <span className="text-sm line-through text-muted-foreground">{skill.cost}</span>
+                  )}
+                  <span className={`text-lg font-bold ${hasDiscount ? 'text-accent' : 'text-foreground'}`}>
+                    {hasDiscount ? discountedPrice : skill.cost}
+                  </span>
+                  <span className="text-sm text-muted-foreground">credits</span>
+                </>
               )}
-              <span className={`text-lg font-bold ${hasDiscount ? 'text-accent' : 'text-foreground'}`}>
-                {hasDiscount ? discountedPrice : skill.cost}
-              </span>
-              <span className="text-sm text-muted-foreground">credits</span>
             </div>
-            <Button 
-              variant={canAfford ? "gaming" : "outline"} 
-              size="sm"
-              onClick={() => onLearn(skill.id)}
-              className={canAfford ? "animate-pulse-glow" : ""}
-              disabled={!canAfford || loading}
-            >
-              {loading ? 'Processing...' : !canAfford ? 'Need More Credits' : 'Learn Now'}
-            </Button>
+            {isPurchased ? (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onViewCourse ? onViewCourse(skill.id) : navigate(`/my-course/${skill.id}`)}
+              >
+                View Course
+              </Button>
+            ) : (
+              <Button 
+                variant={canAfford ? "gaming" : "outline"} 
+                size="sm"
+                onClick={() => onLearn(skill.id)}
+                className={canAfford ? "animate-pulse-glow" : ""}
+                disabled={!canAfford || loading}
+              >
+                {loading ? 'Processing...' : !canAfford ? 'Need More Credits' : 'Learn Now'}
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

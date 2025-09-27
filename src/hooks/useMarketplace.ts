@@ -33,12 +33,13 @@ export const useMarketplace = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserCredits, setCurrentUserCredits] = useState(0);
+  const [purchasedSkills, setPurchasedSkills] = useState<Set<string>>(new Set());
 
   const fetchSkills = async () => {
     try {
       setLoading(true);
       
-      // Fetch current user's credits
+      // Fetch current user's credits and purchased skills
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -88,6 +89,20 @@ export const useMarketplace = () => {
       ) as unknown as SkillListing[];
 
       setSkills(validSkills);
+
+      // Fetch purchased skills if user is logged in
+      if (user) {
+        const { data: purchases } = await supabase
+          .from('transactions')
+          .select('skill_listing_id')
+          .eq('user_id', user.id)
+          .eq('transaction_type', 'purchase');
+
+        if (purchases) {
+          const purchasedIds = new Set(purchases.map(p => p.skill_listing_id));
+          setPurchasedSkills(purchasedIds);
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch skills');
     } finally {
@@ -138,12 +153,18 @@ export const useMarketplace = () => {
     fetchSkills();
   }, []);
 
+  const isSkillPurchased = (skillId: string) => {
+    return purchasedSkills.has(skillId);
+  };
+
   return {
     skills,
     loading,
     error,
     currentUserCredits,
+    purchasedSkills,
     refetch: fetchSkills,
-    calculateDiscountForSkill
+    calculateDiscountForSkill,
+    isSkillPurchased
   };
 };
